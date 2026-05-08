@@ -120,7 +120,9 @@ function calcStreak(dates) {
   return s;
 }
 
-// ── AI COACH ──────────────────────────────────────────────────────────────────
+// ── AI COACH — GEMINI ─────────────────────────────────────────────────────────
+const GEMINI_KEY = "AIzaSyD6dd-a4ZLgpbpzkab1p6O04A-KVvpXnMk";
+const GEMINI_URL = "/api/coach";
 const COACH_SYSTEM = `You are Ignite — a strict but deeply caring personal development coach for students and ambitious young adults. You are direct, surgical, and never generic. You remember everything said in this conversation.
 
 Rules:
@@ -135,27 +137,40 @@ Rules:
 
 async function callFirstResponse(struggling, improve, userName) {
   const userMsg = `What I am struggling with:\n${struggling}\n\nWhat I want to improve:\n${improve}`;
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
+  const prompt = `${COACH_SYSTEM}
+
+My name is ${userName}.
+
+${userMsg}
+
+Reply in this exact JSON format — no markdown, no preamble, just the JSON:
+{"understanding":"2-3 sentences on the root challenge. Be direct.","strategy":["Step 1 — concrete and specific","Step 2","Step 3","Step 4"],"daily_actions":["Action 1 with timing","Action 2","Action 3"],"mindset_note":"One sharp reframe. Not a cliche.","followup":"One sharp follow-up question to keep coaching going."}`;
+
+  const res = await fetch(GEMINI_URL, {
+    method:"POST", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({ contents:[{ parts:[{ text:prompt }] }] }),
+  });
+  const data = await res.json();
+  if (data.error) throw new Error(data.error.message);
+  const raw = data.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
+  return JSON.parse(raw.replace(/```json|```/g,"").trim());
+}
+
+async function callFollowUp(messages) {
+  const history = messages.map(m => ({
+    role: m.role === "assistant" ? "model" : "user",
+    parts:[{ text: m.content }]
+  }));
+  const res = await fetch(GEMINI_URL, {
     method:"POST", headers:{"Content-Type":"application/json"},
     body: JSON.stringify({
-      model:"claude-sonnet-4-20250514", max_tokens:900,
-      system: COACH_SYSTEM + `\n\nFor this FIRST response only, reply in this exact JSON — no markdown:\n{"understanding":"2-3 sentences on the root challenge.","strategy":["Step 1","Step 2","Step 3","Step 4"],"daily_actions":["Action 1 with timing","Action 2","Action 3"],"mindset_note":"One sharp reframe.","followup":"One sharp follow-up question."}`,
-      messages:[{role:"user", content:`My name is ${userName}.\n\n${userMsg}`}],
+      system_instruction:{ parts:[{ text:COACH_SYSTEM }] },
+      contents: history,
     }),
   });
   const data = await res.json();
   if (data.error) throw new Error(data.error.message);
-  return JSON.parse((data.content?.[0]?.text || "{}").replace(/```json|```/g,"").trim());
-}
-
-async function callFollowUp(messages) {
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method:"POST", headers:{"Content-Type":"application/json"},
-    body: JSON.stringify({ model:"claude-sonnet-4-20250514", max_tokens:500, system:COACH_SYSTEM, messages }),
-  });
-  const data = await res.json();
-  if (data.error) throw new Error(data.error.message);
-  return data.content?.[0]?.text || "";
+  return data.candidates?.[0]?.content?.parts?.[0]?.text || "";
 }
 
 // ── TOAST ─────────────────────────────────────────────────────────────────────
