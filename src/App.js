@@ -121,9 +121,7 @@ function calcStreak(dates) {
 }
 
 // ── AI COACH — GEMINI ─────────────────────────────────────────────────────────
-const GEMINI_KEY = "AIzaSyD6dd-a4ZLgpbpzkab1p6O04A-KVvpXnMk";
-const GEMINI_URL = "/api/coach";
-const COACH_SYSTEM = `You are Ignite — a strict but deeply caring personal development coach for students and ambitious young adults. You are direct, surgical, and never generic. You remember everything said in this conversation.
+const GEMINI_URL = "/api/coach";const COACH_SYSTEM = `You are Ignite — a strict but deeply caring personal development coach for students and ambitious young adults. You are direct, surgical, and never generic. You remember everything said in this conversation.
 
 Rules:
 - Always respond to what the user just said specifically
