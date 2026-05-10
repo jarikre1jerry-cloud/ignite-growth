@@ -121,7 +121,7 @@ function calcStreak(dates) {
 }
 
 // ── AI COACH — GEMINI ─────────────────────────────────────────────────────────
-const GEMINI_URL = "/api/coach";const COACH_SYSTEM = `You are Ignite — a strict but deeply caring personal development coach for students and ambitious young adults. You are direct, surgical, and never generic. You remember everything said in this conversation.
+const API_URL = "/api/coach";const COACH_SYSTEM = `You are Ignite — a strict but deeply caring personal development coach for students and ambitious young adults. You are direct, surgical, and never generic. You remember everything said in this conversation.
 
 Rules:
 - Always respond to what the user just said specifically
@@ -134,44 +134,28 @@ Rules:
 - If the user says they've tried before, dig into WHY it failed`;
 
 async function callFirstResponse(struggling, improve, userName) {
-  const userMsg = `What I am struggling with:\n${struggling}\n\nWhat I want to improve:\n${improve}`;
-  const prompt = `${COACH_SYSTEM}
-
-My name is ${userName}.
-
-${userMsg}
-
-Reply in this exact JSON format — no markdown, no preamble, just the JSON:
-{"understanding":"2-3 sentences on the root challenge. Be direct.","strategy":["Step 1 — concrete and specific","Step 2","Step 3","Step 4"],"daily_actions":["Action 1 with timing","Action 2","Action 3"],"mindset_note":"One sharp reframe. Not a cliche.","followup":"One sharp follow-up question to keep coaching going."}`;
-
-  const res = await fetch(GEMINI_URL, {
+  const system = COACH_SYSTEM + `\n\nFor this FIRST response only, reply in this exact JSON — no markdown, no preamble:\n{"understanding":"2-3 sentences on the root challenge. Be direct.","strategy":["Step 1 — concrete","Step 2","Step 3","Step 4"],"daily_actions":["Action 1 with timing","Action 2","Action 3"],"mindset_note":"One sharp reframe. Not a cliche.","followup":"One sharp follow-up question."}`;
+  const res = await fetch("/api/coach", {
     method:"POST", headers:{"Content-Type":"application/json"},
-    body: JSON.stringify({ contents:[{ parts:[{ text:prompt }] }] }),
+    body: JSON.stringify({ system, messages:[{role:"user", content:"My name is "+userName+".\n\nWhat I am struggling with:\n"+struggling+"\n\nWhat I want to improve:\n"+improve}] }),
   });
   const data = await res.json();
-  if (data.error) throw new Error(data.error.message);
-  const raw = data.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
-  return JSON.parse(raw.replace(/```json|```/g,"").trim());
+  if (data.error) throw new Error(data.error);
+  return JSON.parse((data.text || "{}").replace(/```json|```/g,"").trim());
 }
+
 
 async function callFollowUp(messages) {
-  const history = messages.map(m => ({
-    role: m.role === "assistant" ? "model" : "user",
-    parts:[{ text: m.content }]
-  }));
-  const res = await fetch(GEMINI_URL, {
+  const res = await fetch("/api/coach", {
     method:"POST", headers:{"Content-Type":"application/json"},
-    body: JSON.stringify({
-      system_instruction:{ parts:[{ text:COACH_SYSTEM }] },
-      contents: history,
-    }),
+    body: JSON.stringify({ system: COACH_SYSTEM, messages }),
   });
   const data = await res.json();
-  if (data.error) throw new Error(data.error.message);
-  return data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+  if (data.error) throw new Error(data.error);
+  return data.text || "";
 }
 
-// ── TOAST ─────────────────────────────────────────────────────────────────────
+
 function useToast() {
   const [toast, setToast] = useState(null);
   const show = (msg, type="habit") => { setToast({msg,type,id:Date.now()}); setTimeout(()=>setToast(null),2400); };
